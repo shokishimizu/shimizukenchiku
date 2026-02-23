@@ -1,5 +1,4 @@
 version: 1
-# このプロジェクトは Amplify のバックエンド（Cognito/AppSync 等）は使わないため backend は省略
 frontend:
   phases:
     build:

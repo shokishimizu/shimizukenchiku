@@ -1,9 +1,11 @@
 import firebase from 'firebase/compat/app';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getFirebaseServiceAccount } from '../../lib/firebase-admin';
 const { cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
-const serviceAccount = require('../../../firebase-account.json'); // 秘密鍵を取得
 const admin = require('firebase-admin');
+
+const serviceAccount = getFirebaseServiceAccount();
 
 export default async function handler(
     req: NextApiRequest,
