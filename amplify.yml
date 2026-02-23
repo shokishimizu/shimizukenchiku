@@ -4,6 +4,9 @@ frontend:
     build:
       commands:
         - npm ci --cache .npm --prefer-offline
+        # Amplify の環境変数を Next.js ランタイムで使えるように .env.production に書き出す
+        # （Amplify はビルド時のみ env を渡すため、ランタイムでは明示的に読み込む必要がある）
+        - env | grep -e FIREBASE_SERVICE_ACCOUNT -e MAIL_SERVER_PASS >> .env.production || true
         - npm run build
   artifacts:
     baseDirectory: .next
