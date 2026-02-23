@@ -1,0 +1,17 @@
+version: 1
+# このプロジェクトは Amplify のバックエンド（Cognito/AppSync 等）は使わないため backend は省略
+frontend:
+  phases:
+    build:
+      commands:
+        - npm ci --cache .npm --prefer-offline
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .next/cache/**/*
+      - .npm/**/*
+      - node_modules/**/*
