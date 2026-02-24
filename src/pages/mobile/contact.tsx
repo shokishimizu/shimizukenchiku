@@ -39,8 +39,14 @@ export default function Contact() {
         }),
       });
       const jsonData = await response.json();
-      console.log(jsonData);
-      alert("問合せ完了しました。");
+      if (response.ok) {
+        const msg = jsonData.warning
+          ? `問合せ完了しました。\n\n${jsonData.warning}`
+          : "問合せ完了しました。";
+        alert(msg);
+      } else {
+        alert(jsonData.error || "メッセージの送信が失敗しました");
+      }
     } catch (err) {
       alert("メッセージの送信が失敗しました");
     }

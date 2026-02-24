@@ -1,49 +1,95 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import nodeMailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  const transporter = nodeMailer.createTransport({
-      host: "shimizukenchiku.sakura.ne.jp",         // メールサーバー。ここではHotmail/Outlookを使った例
-      port: 587,
-      secure: false,
-      auth: {
-          user: "ryota_shimizukenchiku@shimizukenchiku.info", // メールアドレス
-          pass: process.env.MAIL_SERVER_PASS // パスワード
-      }
-  });
+// 簡易メールアドレス形式チェック
+const isValidEmail = (email: unknown): email is string =>
+  typeof email === "string" &&
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method Not Allowed" });
+  }
+
+  const body = req.body ?? {};
+  const { name, email, tel, message } = body;
+
+  if (!isValidEmail(email)) {
+    console.error("Invalid email:", email);
+    return res.status(400).json({
+      error: "メールアドレスの形式が正しくありません。",
+    });
+  }
+
+  const apiKey = process.env.SENDGRID_API_KEY;
+  const mailTo = process.env.MAIL_TO;
+  const mailFrom = process.env.MAIL_FROM;
+
+  if (!apiKey || !mailTo || !mailFrom) {
+    console.error("Missing env: SENDGRID_API_KEY");
+    return res.status(500).json({
+      error: "メール送信の設定が完了していません。",
+    });
+  }
+
+  sgMail.setApiKey(apiKey);
 
   const msgToManager = {
-    to: 'ryota_shimizukenchiku@shimizukenchiku.info',
-    from: 'ryota_shimizukenchiku@shimizukenchiku.info',
-    subject: 'ホームページからの問い合わせ',
-    text: req.body.name +'様からお問合せがありました。\n' +
-    'アドレス：' + req.body.email + '\n' +
-    '電話番号：' + req.body.tel + '\n' +
-    'メッセージ：' + req.body.message + '\n',
+    to: mailTo,
+    from: mailFrom,
+    replyTo: email,
+    subject: "ホームページからの問い合わせ",
+    text:
+      (name ?? "") +
+      "様からお問合せがありました。\n" +
+      "アドレス：" +
+      email +
+      "\n" +
+      "電話番号：" +
+      (tel ?? "") +
+      "\n" +
+      "メッセージ：" +
+      (message ?? "") +
+      "\n",
   };
 
   const msgToUser = {
-    to: req.body.email,
-    from: 'ryota_shimizukenchiku@shimizukenchiku.info',
-    subject: 'お問合せありがとうございました。',
-    text: 'お問合せを受け付けました。' + req.body.message,
+    to: email,
+    from: mailFrom,
+    replyTo: mailTo,
+    subject: "お問合せありがとうございました。",
+    text: "お問合せを受け付けました。" + (message ?? ""),
     html: `
-      <p>${req.body.name}様</p>
+      <p>${(name ?? "").toString().replace(/</g, "&lt;")}様</p>
       <p>お問合せを受け付けました。</p><br/>
 
       <p>【問い合わせ内容】</p>
-      <p>${req.body.message}</p>
+      <p>${(message ?? "").toString().replace(/</g, "&lt;")}</p>
     `,
   };
 
-  (async () => {
-    try {
-      await transporter.sendMail(msgToManager)
-      await transporter.sendMail(msgToUser)
-      res.status(200).json(msgToUser);
-    } catch (error: any) {
-      console.error(error);
-      res.status(500).json(error);
-    }
-  })();
+  try {
+    await sgMail.send(msgToManager);
+  } catch (error: unknown) {
+    console.error("msgToManager failed:", error);
+    return res.status(500).json({
+      error: "メール送信に失敗しました。（管理者宛）",
+    });
+  }
+
+  try {
+    await sgMail.send(msgToUser);
+  } catch (error: unknown) {
+    console.error("msgToUser failed:", error);
+    // 管理者宛は届いているので 200 を返すが、確認メール失敗を通知
+    return res.status(200).json({
+      message: "送信完了",
+      warning: "確認メールの送信に失敗しました。迷惑メールフォルダをご確認ください。",
+    });
+  }
+
+  return res.status(200).json({ message: "送信完了" });
 }
